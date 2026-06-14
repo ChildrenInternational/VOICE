@@ -1,0 +1,500 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>VOICE — VOICE Optimizes Intent, Clarity, and Expression</title>
+  <link rel="stylesheet" href="css/styles.css" />
+</head>
+<body>
+
+  <header class="site-header">
+    <div class="container header-inner">
+      <div class="brand">
+        <span class="brand-mark" aria-hidden="true"></span>
+        <div>
+          <h1>VOICE</h1>
+          <p class="brand-sub">VOICE Optimizes Intent, Clarity, and Expression &middot; AI Advancement Committee</p>
+        </div>
+      </div>
+      <div class="header-right">
+        <button class="btn btn-ghost btn-sm mode-btn" id="voiceModeBtn" type="button" hidden>VOICE Personas</button>
+        <button class="btn btn-ghost btn-sm mode-btn" id="sponsorJumpBtn" type="button" hidden>Sponsor Thinking</button>
+        <span id="userBadge" class="user-badge" hidden></span>
+        <span id="serverStatus" class="server-status" title="AI connection status">Checking AI connection…</span>
+      </div>
+    </div>
+  </header>
+
+  <main class="container">
+
+    <!-- ============ INTRO ============ -->
+    <section class="intro" id="voiceIntro">
+      <h2>One message. Thirteen ways to say it.</h2>
+      <p>
+        Every writing voice is a position on 33 spectrums — clarity vs. expression, blunt vs. polished,
+        peer vs. authority, and more. The combinations number in the millions; these 13 voices mark the
+        distinct, useful territories. Pick a voice, study its profile, then paste real content below and
+        hear it spoken in that voice.
+      </p>
+    </section>
+
+    <!-- ============ MARKETING SPONSOR THINKING ============ -->
+    <section class="sponsor-workspace" id="sponsor-section" hidden>
+      <div class="workspace-head">
+        <div>
+          <h2>Sponsor Thinking Lab</h2>
+          <p class="step-sub">Build sponsor archetypes, match them to the voices most likely to resonate, then rehearse a message before it launches.</p>
+        </div>
+      </div>
+      <div class="sponsor-journey" aria-label="Sponsor Thinking workflow">
+        <div><span>1</span><strong>Build the cast</strong><p>Create sponsor archetypes and keep the profile levers visible.</p></div>
+        <div><span>2</span><strong>Match the cast</strong><p>Compare every saved voice and tune the voice persona for this archetype.</p></div>
+        <div><span>3</span><strong>Rehearse the message</strong><p>Exercise the selected sponsor archetype with a real campaign idea.</p></div>
+      </div>
+      <div class="sponsor-layout">
+        <section class="sponsor-pane sponsor-library-card" aria-labelledby="sponsorLibraryTitle">
+          <div class="pane-head">
+            <div>
+              <h3 id="sponsorLibraryTitle">1. Build sponsor archetypes</h3>
+              <p class="pane-sub">Select a built-in thinker or create a custom archetype. The selected archetype stays as the sponsor lens for matching and rehearsal.</p>
+            </div>
+            <button class="btn btn-ghost btn-sm" id="describeSponsorBtn" type="button">Describe a sponsor persona…</button>
+          </div>
+          <div id="sponsorGrid" class="voice-grid sponsor-voice-grid"></div>
+          <div class="selected-sponsor-block">
+            <div class="pane-head">
+              <h3>Selected sponsor archetype</h3>
+              <button class="btn btn-ghost btn-sm" id="editSponsorBtn" type="button" hidden>Edit</button>
+            </div>
+            <div id="sponsorPersonaPanel" class="sponsor-output">
+              <p class="placeholder">Pick a sponsor persona to see its profile here.</p>
+            </div>
+          </div>
+        </section>
+
+        <section class="sponsor-pane sponsor-match-card" aria-labelledby="sponsorMatchTitle">
+          <div class="pane-head">
+            <div>
+              <h3 id="sponsorMatchTitle">2. Match voices to this archetype</h3>
+              <p class="pane-sub">Rank all voices for the selected sponsor, then see which levers to tune when your preferred voice is not the strongest fit.</p>
+            </div>
+            <button class="btn btn-ghost btn-sm" id="copyVoiceMatchBtn" type="button" hidden>Copy</button>
+          </div>
+          <p class="sponsor-context-line">Matching against <strong id="matchSponsorName">the selected sponsor archetype</strong>.</p>
+          <form id="voiceMatchForm" class="sponsor-form voice-match-form">
+            <label>
+              Voice to tune for this sponsor <span class="optional">compared with all voices</span>
+              <select id="matchVoiceSelect"></select>
+            </label>
+            <div class="modal-actions left">
+              <button class="btn btn-primary" id="voiceMatchBtn" type="submit">Match voices to sponsor</button>
+            </div>
+          </form>
+          <div id="voiceMatchOutput" class="sponsor-output">
+            <p class="placeholder">Choose a sponsor persona, then compare voices to see the best fit and lever tuning guidance.</p>
+          </div>
+        </section>
+
+        <section class="sponsor-pane sponsor-rehearsal-card" aria-labelledby="sponsorRehearsalTitle">
+          <div class="pane-head">
+            <div>
+              <h3 id="sponsorRehearsalTitle">3. Rehearse a message</h3>
+              <p class="pane-sub">Use the same selected archetype and editable profile levers to predict first reactions, objections, and framing.</p>
+            </div>
+            <button class="btn btn-ghost btn-sm" id="copySponsorBtn" type="button" hidden>Copy</button>
+          </div>
+          <p class="sponsor-context-line">Rehearsing as <strong id="rehearsalSponsorName">the selected sponsor archetype</strong> with <strong id="rehearsalVoiceName">the selected voice</strong> as voice context.</p>
+          <div class="sponsor-rehearsal-grid">
+            <form id="sponsorForm" class="sponsor-form">
+              <h4>Profile levers</h4>
+              <p class="pane-sub">Adjust these if the selected archetype needs to reflect a narrower sponsor profile for this message.</p>
+              <div id="sponsorFields" class="sponsor-field-grid"></div>
+              <label>
+                Idea or message to test
+                <textarea id="sponsorIdea" rows="5" placeholder="Example: A new sponsor story format that leads with impact data before the child story…"></textarea>
+              </label>
+              <label>
+                Extra context <span class="optional">optional</span>
+                <textarea id="sponsorContext" rows="3" placeholder="Anything else the persona should know about the audience, timing, or campaign…"></textarea>
+              </label>
+              <div class="modal-actions left">
+                <button class="btn btn-primary" id="sponsorAnalyzeBtn" type="submit">Test sponsor reaction</button>
+              </div>
+            </form>
+            <div id="sponsorOutput" class="sponsor-output sponsor-reaction-output">
+              <p class="placeholder">Message rehearsal results will appear here without replacing the selected sponsor archetype.</p>
+            </div>
+          </div>
+        </section>
+      </div>
+    </section>
+
+    <!-- ============ STEP 1: VOICE GALLERY ============ -->
+    <section class="step" id="gallery-section">
+      <div class="step-head">
+        <span class="step-num">1</span>
+        <div>
+          <h2>Choose a voice</h2>
+          <p class="step-sub">Grouped by archetype: <strong>Operators</strong> get things done, <strong>Consultants</strong> advise, <strong>Thought Leaders</strong> reframe.</p>
+        </div>
+      </div>
+      <div class="gallery-toolbar">
+        <div class="archetype-filter" id="archetypeFilter" role="tablist" aria-label="Filter voices by archetype"></div>
+        <button class="btn btn-ghost btn-sm" id="describeBtn" type="button">✦ Describe a voice…</button>
+      </div>
+      <div class="voice-grid" id="voiceGrid"></div>
+    </section>
+
+    <!-- ============ STEP 2: VOICE PROFILE ============ -->
+    <section class="step" id="profile-section" hidden>
+      <div class="step-head">
+        <span class="step-num">2</span>
+        <div>
+          <h2>Understand it — then tune it</h2>
+          <p class="step-sub">Every slider is live: drag to tune the voice, blend it with another, or apply your own style fingerprint. Faint dots show the other voices; the hollow marker is the base voice's original position.</p>
+        </div>
+      </div>
+      <div id="voiceProfile"></div>
+    </section>
+
+    <!-- ============ STEP 3: STUDIO ============ -->
+    <section class="step" id="studio-section" hidden>
+      <div class="step-head">
+        <span class="step-num">3</span>
+        <div>
+          <h2>Hear it speak</h2>
+          <p class="step-sub">Paste any draft — an announcement, a how-to, a policy note — and transform it into the selected voice with Azure AI.</p>
+        </div>
+      </div>
+
+      <div class="studio">
+        <div class="studio-pane">
+          <div class="pane-head">
+            <h3>Your content</h3>
+            <button class="btn btn-ghost btn-sm" id="sampleBtn" type="button">Use sample content</button>
+          </div>
+          <textarea id="inputText" rows="9" placeholder="Paste the content you want rewritten in the selected voice…"></textarea>
+          <div class="workiq-panel" id="workIqPanel">
+            <label class="workiq-toggle">
+              <input id="workIqEnabled" type="checkbox">
+              <span>
+                <strong>Use my work context</strong>
+                <small>Ground this draft in relevant Microsoft 365 context through Work IQ.</small>
+              </span>
+            </label>
+            <p class="workiq-status" id="workIqStatus">Checking Work IQ connection…</p>
+            <div class="workiq-options" id="workIqOptions" hidden>
+              <label for="workIqQuery">What should VOICE look for in your work context?</label>
+              <textarea id="workIqQuery" rows="3" placeholder="Example: recent Teams discussions, meeting notes, and documents about the AI Hub launch"></textarea>
+            </div>
+          </div>
+          <div class="studio-actions">
+            <button class="btn btn-primary" id="transformBtn" type="button">
+              <span id="transformLabel">Transform with <span id="transformVoiceName">…</span></span>
+            </button>
+            <button class="btn btn-ghost" id="viewPromptBtn" type="button">View the prompt</button>
+          </div>
+          <p class="hint" id="connectionHint" hidden>
+            The server's AI connection is not configured yet. An administrator must set the AI app settings in the Azure App Service configuration.
+          </p>
+        </div>
+
+        <div class="studio-pane">
+          <div class="pane-head">
+            <h3>In the voice of <span id="outputVoiceName" class="accent-text">—</span></h3>
+            <button class="btn btn-ghost btn-sm" id="copyOutputBtn" type="button" hidden>Copy</button>
+          </div>
+          <div id="outputArea" class="output-area">
+            <p class="placeholder">The rewritten content will appear here.</p>
+          </div>
+          <div id="workIqContextPanel" class="workiq-context" hidden></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ RED LINES ============ -->
+    <section class="step" id="redlines-section">
+      <div class="step-head">
+        <span class="step-num red">!</span>
+        <div>
+          <h2>Red lines — every voice, no exceptions</h2>
+          <p class="step-sub">Anti-patterns enforced in every prompt, regardless of which voice is speaking.</p>
+        </div>
+      </div>
+      <div class="redlines-grid" id="redlinesGrid"></div>
+    </section>
+
+  </main>
+
+  <footer class="site-footer">
+    <div class="container">
+      <p>VOICE — VOICE Optimizes Intent, Clarity, and Expression. Content you transform is sent to the organization's Azure AI service via this site's server; credentials are managed server-side by administrators.</p>
+    </div>
+  </footer>
+
+  <!-- ============ SAVE CUSTOM VOICE MODAL ============ -->
+  <dialog id="saveVoiceModal" class="modal">
+    <form class="modal-body" id="saveVoiceForm">
+      <h3>Save as custom voice</h3>
+      <p class="modal-sub" id="saveProvenance"></p>
+      <label>
+        Name
+        <input type="text" id="svName" maxlength="60" placeholder="e.g. The Committee Standard" required />
+      </label>
+      <label>
+        Tagline <span class="optional">optional</span>
+        <input type="text" id="svTagline" maxlength="80" placeholder="One line that captures it" />
+      </label>
+      <label>
+        Tags <span class="optional">up to 5, comma-separated — shown on the voice card</span>
+        <input type="text" id="svTags" maxlength="140" placeholder="e.g. Warm, Donor-facing, Story-driven" />
+      </label>
+      <div class="field-label">Color</div>
+      <div class="swatches" id="svSwatches"></div>
+      <label>
+        Creativity (temperature) · <span id="svTempVal">0.50</span>
+        <input type="range" id="svTemp" min="0" max="100" value="50" />
+      </label>
+      <label>
+        Voice essence <span class="optional">feeds the AI prompt — edit freely</span>
+        <textarea id="svEssence" rows="4"></textarea>
+      </label>
+      <p class="error" id="svError"></p>
+      <div class="modal-actions">
+        <button type="button" class="btn btn-ghost" id="svCancelBtn">Cancel</button>
+        <button type="submit" class="btn btn-primary" id="svSaveBtn">Save voice</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- ============ HYPER-PERSONALIZATION TERMS MODAL ============ -->
+  <dialog id="termsModal" class="modal">
+    <div class="modal-body">
+      <h3>Hyper-personalization — Terms of Use</h3>
+      <p class="modal-sub">Version 1.0 · You must accept these terms once before using the style fingerprint feature.</p>
+      <div class="terms-text">
+        <p><strong>1. Your voice, or voices you're authorized to speak for.</strong> The hyper-personalization feature builds a writing voice from the answers and writing samples you provide. You may only create personalized voices that represent <em>you</em>, or a person or role you have been <em>explicitly authorized</em> to write on behalf of.</p>
+        <p><strong>2. No impersonation.</strong> You must not use this feature to create content in the voice of another person — a colleague, an executive, a public figure, anyone — without their explicit authorization. Doing so is a misuse of this tool, regardless of intent.</p>
+        <p><strong>3. Attribution and accountability.</strong> Voices you create are attributed to your signed-in account. You remain responsible for content produced with your personalized voices, exactly as if you had written it yourself.</p>
+        <p><strong>4. Committee oversight.</strong> The AI Advancement Committee may review, restrict, or remove personalized voices and may revoke access to this feature at any time.</p>
+      </div>
+      <label class="terms-agree">
+        <input type="checkbox" id="termsAgree" />
+        I have read and agree to these terms. I will not create content in the voice of anyone I am not authorized to speak for.
+      </label>
+      <p class="error" id="termsError"></p>
+      <div class="modal-actions">
+        <button type="button" class="btn btn-ghost" id="termsCancelBtn">Cancel</button>
+        <button type="button" class="btn btn-primary" id="termsAcceptBtn">Accept and continue</button>
+      </div>
+    </div>
+  </dialog>
+
+  <!-- ============ STYLE FINGERPRINT MODAL ============ -->
+  <dialog id="fpModal" class="modal modal-wide">
+    <div class="modal-body">
+      <h3>Your style fingerprint</h3>
+      <p class="terms-reminder">⚖️ Reminder: personalized voices may only represent <strong>you</strong>, or someone you are explicitly authorized to write for. Never create content in another person's voice without their permission.</p>
+      <p class="modal-sub">Answer in your own words — write the way you actually write. Each answer is analyzed across the voice dimensions it probes, and <em>how</em> you write your answers is analyzed too. The AI then personalizes the base voice's prompt around you.</p>
+      <div id="fpQuestions" class="fp-questions"></div>
+      <label class="fp-sample-label">
+        Optional: paste a short sample of your writing — an email, a doc intro, anything that sounds like you
+        <textarea id="fpSample" rows="4" placeholder="Paste a few sentences you actually wrote…"></textarea>
+      </label>
+      <div class="fp-merge">
+        <label>
+          Base voice
+          <select id="fpBase"></select>
+        </label>
+        <p class="fp-merge-hint">The AI starts from this voice's full prompt and personalizes it with your answers.</p>
+      </div>
+      <p class="error" id="fpHint"></p>
+      <div class="modal-actions">
+        <button type="button" class="btn btn-ghost" id="fpCancelBtn">Cancel</button>
+        <button type="button" class="btn btn-primary" id="fpGenerateBtn">Generate my personal prompt</button>
+      </div>
+    </div>
+  </dialog>
+
+  <!-- ============ FINGERPRINT RESULT / PROMPT EDITOR MODAL ============ -->
+  <dialog id="fpResultModal" class="modal modal-wide">
+    <div class="modal-body">
+      <h3 id="fprTitle">Your personalized voice prompt</h3>
+      <p class="terms-reminder">⚖️ Reminder: this personalized voice may only represent you, or someone you are explicitly authorized to write for.</p>
+      <p class="modal-sub" id="fprSub">Started from <strong id="fprBaseName"></strong> — <mark class="legend-mark">highlighted text</mark> shows what changed based on your answers. Edit any part directly before saving.</p>
+      <div id="fprEditor" class="prompt-editor" contenteditable="true" spellcheck="false"></div>
+      <p class="error" id="fprError"></p>
+      <div class="modal-actions">
+        <button type="button" class="btn btn-ghost" id="fprBackBtn">Back</button>
+        <button type="button" class="btn btn-primary" id="fprSaveBtn">Save as custom voice…</button>
+      </div>
+    </div>
+  </dialog>
+
+  <!-- ============ DESCRIBE A VOICE MODAL ============ -->
+  <dialog id="describeModal" class="modal modal-wide">
+    <div class="modal-body">
+      <!-- Step 1: describe -->
+      <div id="dvStepInput">
+        <h3 id="dvInputTitle">Describe a voice</h3>
+        <p class="modal-sub" id="dvInputSub">Describe the voice you want in your own words — who it's for, how it should feel, what it should never do. VOICE will clarify your description, calibrate all 33 levers, and design a complete persona with you.</p>
+        <textarea id="dvDescription" rows="6" placeholder="e.g. A warm but no-nonsense voice for sponsor thank-you letters. It should feel personal and grateful without being gushy, keep sentences short, avoid charity clichés, and always end with one concrete example of impact…"></textarea>
+        <p class="error" id="dvError"></p>
+        <div class="modal-actions">
+          <button type="button" class="btn btn-ghost" id="dvCancelBtn">Cancel</button>
+          <button type="button" class="btn btn-primary" id="dvGenerateBtn">✦ Design with VOICE</button>
+        </div>
+      </div>
+      <!-- Step 2: preview & save -->
+      <div id="dvStepPreview" hidden>
+        <h3>Meet your new voice</h3>
+        <p class="modal-sub">Designed by VOICE from your description — adjust anything before saving. After saving you can fine-tune all 33 levers in the Voice Lab.</p>
+        <div class="dv-preview" id="dvPreviewCard">
+          <label>
+            Name
+            <input type="text" id="dvName" maxlength="60" required />
+          </label>
+          <label>
+            Tagline
+            <input type="text" id="dvTagline" maxlength="80" />
+          </label>
+          <label>
+            Tags <span class="optional">up to 5, comma-separated</span>
+            <input type="text" id="dvTags" maxlength="140" placeholder="e.g. Warm, Donor-facing, Story-driven" />
+          </label>
+          <div class="field-label">Color</div>
+          <div class="swatches" id="dvSwatches"></div>
+          <div class="dv-chips" id="dvChips"></div>
+          <h4>Sounds like</h4>
+          <blockquote class="voice-sample" id="dvSample"></blockquote>
+          <label>
+            Voice essence <span class="optional">feeds the AI prompt — edit freely</span>
+            <textarea id="dvEssence" rows="4"></textarea>
+          </label>
+          <div class="dv-lists">
+            <div><h4>Signature moves</h4><ul id="dvMoves"></ul></div>
+            <div><h4>Never does</h4><ul class="never-list" id="dvNever"></ul></div>
+          </div>
+        </div>
+        <p class="error" id="dvSaveError"></p>
+        <div class="modal-actions">
+          <button type="button" class="btn btn-ghost" id="dvBackBtn">Back to description</button>
+          <button type="button" class="btn btn-primary" id="dvSaveBtn">Save to custom voices</button>
+        </div>
+      </div>
+    </div>
+  </dialog>
+
+  <!-- ============ DESCRIBE A SPONSOR PERSONA MODAL ============ -->
+  <dialog id="sponsorDescribeModal" class="modal modal-wide">
+    <div class="modal-body">
+      <div id="spStepInput">
+        <h3 id="spInputTitle">Describe a sponsor persona</h3>
+        <p class="modal-sub" id="spInputSub">Describe the sponsor thinker you want VOICE to model — what kind of sponsor they are, how they react, what they care about, and what they never buy into.</p>
+        <textarea id="spDescription" rows="6" placeholder="e.g. A skeptical executive sponsor who likes concise data, wants to see risk controls, and responds best when impact and efficiency are stated plainly…"></textarea>
+        <p class="error" id="spError"></p>
+        <div class="modal-actions">
+          <button type="button" class="btn btn-ghost" id="spCancelBtn">Cancel</button>
+          <button type="button" class="btn btn-primary" id="spGenerateBtn">✦ Design with VOICE</button>
+        </div>
+      </div>
+      <div id="spStepPreview" hidden>
+        <h3>Meet your sponsor persona</h3>
+        <p class="modal-sub">Designed by VOICE from your description — adjust anything before saving. You can later use this persona to test new ideas or edit it in place.</p>
+        <div class="dv-preview" id="spPreviewCard">
+          <label>
+            Name
+            <input type="text" id="spName" maxlength="60" required />
+          </label>
+          <label>
+            Tagline
+            <input type="text" id="spTagline" maxlength="80" />
+          </label>
+          <label>
+            Summary <span class="optional">what this persona is like</span>
+            <textarea id="spSummary" rows="3"></textarea>
+          </label>
+          <div class="field-label">Color</div>
+          <div class="swatches" id="spSwatches"></div>
+          <label>
+            Chips <span class="optional">up to 3, comma-separated</span>
+            <input type="text" id="spChips" maxlength="120" placeholder="e.g. Skeptical, Data-first, Low fluff" />
+          </label>
+          <div id="spProfileFields" class="sponsor-field-grid"></div>
+          <label>
+            Initial reaction
+            <textarea id="spInitialReaction" rows="3"></textarea>
+          </label>
+          <label>
+            Likely questions <span class="optional">comma-separated or sentences</span>
+            <textarea id="spQuestions" rows="3"></textarea>
+          </label>
+          <label>
+            Likely concerns <span class="optional">comma-separated or sentences</span>
+            <textarea id="spConcerns" rows="3"></textarea>
+          </label>
+          <label>
+            Recommended framing
+            <textarea id="spFraming" rows="3"></textarea>
+          </label>
+          <div class="dv-lists">
+            <div>
+              <h4>Content strategy</h4>
+              <div class="sponsor-strategy">
+                <label>Tone<input type="text" id="spTone" /></label>
+                <label>Length<input type="text" id="spLength" /></label>
+                <label>Structure<input type="text" id="spStructure" /></label>
+                <label>Proof<input type="text" id="spProof" /></label>
+              </div>
+            </div>
+          </div>
+        </div>
+        <p class="error" id="spSaveError"></p>
+        <div class="modal-actions">
+          <button type="button" class="btn btn-ghost" id="spBackBtn">Back to description</button>
+          <button type="button" class="btn btn-primary" id="spSaveBtn">Save to marketing personas</button>
+        </div>
+      </div>
+    </div>
+  </dialog>
+
+  <!-- ============ PUBLISH AGENT MODAL ============ -->
+  <dialog id="publishModal" class="modal">
+    <div class="modal-body">
+      <h3>Publish “<span id="pubVoiceName"></span>” as an M365 agent</h3>
+      <p class="modal-sub">Turns this persona into a Microsoft 365 Copilot agent package you can upload to your organization.</p>
+      <div class="pub-steps">
+        <p><span class="pub-num">1</span> <strong>Download the agent package</strong> — a standard declarative-agent zip built from this persona's full prompt, with icons in the voice's color.</p>
+        <p><span class="pub-num">2</span> <strong>Upload it to Microsoft 365 Copilot</strong> — if your tenant shows an Agents upload UI, use that; otherwise sideload the zip through <em>Teams → Apps → Manage your apps → Upload an app</em>. Org-wide publishing goes through the Teams admin center.</p>
+        <p><span class="pub-num">3</span> <strong>Use it with M365 data</strong> — anyone with an M365 Copilot license can chat with the persona, and it can ground its drafts in their OneDrive, SharePoint, and connected sources.</p>
+        <p><span class="pub-num">4</span> <strong>Hand off to CoWork</strong> — the agent is instructed to offer its finished text to Microsoft's CoWork agent, which can turn it into documents, presentations, and other media without changing the voice's wording.</p>
+      </div>
+      <p class="terms-reminder" id="pubTrimNote" hidden>ℹ This persona's prompt exceeds the 8,000-character agent limit and will be lightly condensed in the package.</p>
+      <p class="error" id="pubError"></p>
+      <div class="modal-actions">
+        <button type="button" class="btn btn-ghost" id="pubCancelBtn">Close</button>
+        <button type="button" class="btn btn-primary" id="pubDownloadBtn">Download agent package</button>
+      </div>
+    </div>
+  </dialog>
+
+  <!-- ============ PROMPT VIEWER MODAL ============ -->
+  <dialog id="promptModal" class="modal modal-wide">
+    <div class="modal-body">
+      <div class="pane-head">
+        <h3>Prompt sent to Azure AI — <span id="promptVoiceName" class="accent-text"></span></h3>
+        <button class="btn btn-ghost btn-sm" id="copyPromptBtn" type="button">Copy</button>
+      </div>
+      <p class="modal-sub">Generated from this voice's spectrum positions, signature moves, and the universal red lines. Use it in any tool that accepts a system prompt.</p>
+      <pre id="promptText" class="prompt-text"></pre>
+      <div class="modal-actions">
+        <button type="button" class="btn btn-primary" id="closePromptBtn">Close</button>
+      </div>
+    </div>
+  </dialog>
+
+  <script src="js/voices.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
