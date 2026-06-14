@@ -163,3 +163,61 @@ Current coverage validates:
 - Sponsor reaction rehearsal keeps custom selected sponsor archetypes as the visible context even when AI returns a different analysis lens internally.
 - Work IQ Studio controls for members, disabled-state messaging, successful endpoint usage, and context/reference rendering.
 - Mobile VOICE and Sponsor Thinking layouts: no horizontal overflow, stacked panes, and usable sponsor modal controls.
+	U[User Browser]
+
+	subgraph Frontend
+		Index[index.html]
+		Welcome[welcome.html]
+		App[js/app.js]
+		Voices[js/voices.js]
+		Styles[css/styles.css]
+		Index --> App
+		Welcome --> App
+		App --> Voices
+		Index --> Styles
+		Welcome --> Styles
+	end
+
+	subgraph Backend
+		Server[server.js]
+		Health[/api/health]
+		Me[/api/me]
+		Transform[/api/transform]
+		WorkIQ[/api/work-context-draft]
+		Describe[/api/describe]
+		Sponsor[/api/sponsor-reaction]
+		VoiceStore[/api/voices]
+		Terms[/api/terms/accept]
+		Access[/api/access-request]
+		Server --> Health
+		Server --> Me
+		Server --> Transform
+		Server --> WorkIQ
+		Server --> Describe
+		Server --> Sponsor
+		Server --> VoiceStore
+		Server --> Terms
+		Server --> Access
+	end
+
+	subgraph External
+		EasyAuth[Azure App Service Easy Auth]
+		AzureAI[Azure AI Provider]
+		WorkIQSvc[Work IQ Gateway]
+	end
+
+	subgraph Tests
+		Playwright[e2e/*.spec.js]
+		Config[playwright.config.js]
+		Playwright --> Config
+	end
+
+	U --> Index
+	U --> Welcome
+	App -->|fetch /api/*| Server
+	EasyAuth --> Server
+	Transform --> AzureAI
+	Describe --> AzureAI
+	Sponsor --> AzureAI
+	WorkIQ --> WorkIQSvc
+```
