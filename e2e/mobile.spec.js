@@ -115,14 +115,18 @@ test.describe("mobile layout", () => {
     await page.locator("#sponsorJumpBtn").click();
 
     await expect(page.locator("#sponsor-section")).toBeVisible();
+    await expect(page.locator("#voiceIntro")).toBeHidden();
     await expect(page.locator("#gallery-section")).toBeHidden();
+    await expect(page.locator(".sponsor-pane")).toHaveCount(3);
     await expectNoHorizontalOverflow(page);
 
     const panes = await page.locator(".sponsor-pane").evaluateAll((els) => els.map((el) => {
       const box = el.getBoundingClientRect();
       return { top: box.top, width: box.width };
     }));
-    expect(panes[1].top).toBeGreaterThan(panes[0].top);
+    for (let i = 1; i < panes.length; i++) {
+      expect(panes[i].top).toBeGreaterThan(panes[i - 1].top);
+    }
     expect(Math.max(...panes.map((pane) => pane.width))).toBeLessThanOrEqual(360);
 
     await page.getByRole("button", { name: "Describe a sponsor persona…" }).click();

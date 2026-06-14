@@ -28,6 +28,7 @@
   /* ---------- Element refs ---------- */
   const $ = (id) => document.getElementById(id);
   const voiceGrid = $("voiceGrid");
+  const voiceIntro = $("voiceIntro");
   const sponsorSection = $("sponsor-section");
   const sponsorFields = $("sponsorFields");
   const sponsorForm = $("sponsorForm");
@@ -228,6 +229,7 @@
   function renderWorkspaceVisibility() {
     const sponsorMode = currentUser.marketingAccess && activeWorkspace === "sponsor";
     if (sponsorSection) sponsorSection.hidden = !sponsorMode;
+    if (voiceIntro) voiceIntro.hidden = sponsorMode;
     if (gallerySection) gallerySection.hidden = sponsorMode;
     if (redlinesSection) redlinesSection.hidden = sponsorMode;
     if (profileSection) profileSection.hidden = sponsorMode || !selectedVoice;
@@ -243,6 +245,7 @@
       sponsorBtn.hidden = !currentUser.marketingAccess;
       sponsorBtn.classList.toggle("active", sponsorMode);
     }
+    updateSponsorWorkflowContext();
   }
 
   function renderSponsorFields() {
@@ -276,35 +279,11 @@
   }
 
   function renderSponsorOutput(persona) {
-    const strategy = persona.contentStrategy || {};
-    sponsorOutput.innerHTML =
-      '<div class="sponsor-card">' +
-      '<div class="sponsor-meta"><span class="card-archetype">Thinking persona</span><span>' + Math.round((persona.confidence || 0.5) * 100) + "% confidence</span></div>" +
-      "<h4>" + esc(persona.personaName || persona.name || "Sponsor Persona") + "</h4>" +
-      '<p class="profile-desc">' + esc(persona.personaSummary || persona.summary || "") + "</p>" +
-      '<p><strong>Initial reaction:</strong> ' + esc(persona.initialReaction || "") + "</p>" +
-      '<div class="sponsor-strategy">' +
-      '<div><strong>Likely questions</strong><ul class="sponsor-list">' + (persona.likelyQuestions || []).map((q) => "<li>" + esc(q) + "</li>").join("") + "</ul></div>" +
-      '<div><strong>Likely concerns</strong><ul class="sponsor-list">' + (persona.likelyConcerns || []).map((q) => "<li>" + esc(q) + "</li>").join("") + "</ul></div>" +
-      "</div>" +
-      '<p><strong>Recommended framing:</strong> ' + esc(persona.recommendedFraming || "") + "</p>" +
-      '<div class="sponsor-strategy">' +
-      '<div><strong>Tone</strong> ' + esc(strategy.tone || "") + "</div>" +
-      '<div><strong>Length</strong> ' + esc(strategy.length || "") + "</div>" +
-      '<div><strong>Structure</strong> ' + esc(strategy.structure || "") + "</div>" +
-      '<div><strong>Proof</strong> ' + esc(strategy.proof || "") + "</div>" +
-      "</div>" +
-      "</div>";
-    const copyBtn = $("copySponsorBtn");
-    copyBtn.hidden = false;
-    copyBtn.dataset.text = JSON.stringify(persona, null, 2);
+    renderSponsorResult(persona);
   }
 
   function clearSponsorOutput() {
-    sponsorOutput.innerHTML = '<p class="placeholder">The thinking persona and reaction will appear here.</p>';
-    const copyBtn = $("copySponsorBtn");
-    copyBtn.hidden = true;
-    copyBtn.dataset.text = "";
+    clearSponsorResult();
   }
 
   function renderSponsorPreview() {
@@ -495,14 +474,18 @@
     }
   }
 
-  function renderSponsorResult(persona) {
+  function renderSponsorResult(persona, selectedSponsor) {
+    const sponsor = selectedSponsor || sponsorState.selected || {};
+    const sponsorName = sponsor.name || persona.personaName || persona.name || "Sponsor archetype";
+    const sponsorLabel = sponsorArchetype(sponsor);
     const strategy = persona.contentStrategy || {};
     const confidence = Number.isFinite(Number(persona.confidence)) ? Number(persona.confidence) : 0.5;
+    const summary = persona.personaSummary || persona.summary || sponsor.summary || "";
     sponsorOutput.innerHTML =
       '<div class="sponsor-card">' +
-      '<div class="sponsor-meta"><span class="card-archetype">Thinking persona</span><span>confidence ' + Math.round(confidence * 100) + "%</span></div>" +
-      "<h4>" + esc(persona.personaName || persona.name || "Sponsor Persona") + "</h4>" +
-      '<p class="profile-desc">' + esc(persona.personaSummary || persona.summary || "") + "</p>" +
+      '<div class="sponsor-meta"><span class="card-archetype">Message rehearsal</span><span>' + esc(sponsorLabel) + '</span><span>analysis confidence ' + Math.round(confidence * 100) + "%</span></div>" +
+      "<h4>Reaction from " + esc(sponsorName) + "</h4>" +
+      (summary ? '<p class="analysis-note"><strong>AI read:</strong> ' + esc(summary) + "</p>" : "") +
       '<p><strong>Initial reaction:</strong> ' + esc(persona.initialReaction || "") + "</p>" +
       '<div class="sponsor-strategy">' +
       '<div><strong>Likely questions</strong><ul class="sponsor-list">' + (persona.likelyQuestions || []).map((q) => "<li>" + esc(q) + "</li>").join("") + "</ul></div>" +
@@ -519,12 +502,12 @@
     const copyBtn = $("copySponsorBtn");
     if (copyBtn) {
       copyBtn.hidden = false;
-      copyBtn.dataset.text = JSON.stringify(persona, null, 2);
+      copyBtn.dataset.text = JSON.stringify({ sponsor: currentSponsorMatchProfile(), reaction: persona }, null, 2);
     }
   }
 
   function clearSponsorResult() {
-    sponsorOutput.innerHTML = '<p class="placeholder">The thinking persona and reaction will appear here.</p>';
+    sponsorOutput.innerHTML = '<p class="placeholder">Message rehearsal results will appear here without replacing the selected sponsor archetype.</p>';
     const copyBtn = $("copySponsorBtn");
     if (copyBtn) {
       copyBtn.hidden = true;
@@ -543,12 +526,15 @@
     const btn = $("sponsorAnalyzeBtn");
     const oldLabel = btn.innerHTML;
     btn.disabled = true;
-    btn.innerHTML = '<span class="spinner"></span> Analyzing…';
+    btn.innerHTML = '<span class="spinner"></span> Rehearsing…';
+    sponsorOutput.innerHTML = '<p class="placeholder">Testing the message against ' + esc((sponsorState.selected && sponsorState.selected.name) || "the selected sponsor archetype") + "…</p>";
     try {
+      const sponsor = currentSponsorMatchProfile();
       const res = await fetch("api/sponsor-reaction", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          sponsor,
           profile: collectSponsorProfile(),
           idea,
           context: $("sponsorContext").value.trim()
@@ -560,7 +546,7 @@
       if (!data.persona.initialReaction && !(data.persona.likelyQuestions || []).length && !(data.persona.likelyConcerns || []).length) {
         throw new Error("The AI response did not include a usable sponsor reaction. Please try again.");
       }
-      renderSponsorResult(data.persona);
+      renderSponsorResult(data.persona, sponsorState.selected);
     } catch (err) {
       sponsorOutput.innerHTML = '<p class="error">⚠ ' + esc(err.message) + "</p>";
       const copyBtn = $("copySponsorBtn");
@@ -662,11 +648,13 @@
     sponsorState.draft = null;
     renderSponsorGallery();
     renderSponsorPanel(persona);
+    clearSponsorResult();
     clearVoiceMatchResult();
     if (populateForm) {
       renderSponsorFields(persona.profile || {});
     }
     $("editSponsorBtn").hidden = !canModifySponsor(persona);
+    updateSponsorWorkflowContext();
   }
 
   function renderSponsorPanel(persona) {
@@ -767,6 +755,20 @@
     } else if (selectedVoice && allVoices().some((voice) => voice.id === selectedVoice.id)) {
       select.value = selectedVoice.id;
     }
+    updateSponsorWorkflowContext();
+  }
+
+  function updateSponsorWorkflowContext() {
+    const sponsorName = sponsorState.selected ? sponsorState.selected.name : "the selected sponsor archetype";
+    const sponsorNodes = [$("matchSponsorName"), $("rehearsalSponsorName")];
+    sponsorNodes.forEach((node) => {
+      if (node) node.textContent = sponsorName;
+    });
+    const select = $("matchVoiceSelect");
+    const selectedOption = select && select.options && select.options[select.selectedIndex];
+    const voiceName = selectedOption ? selectedOption.textContent : (selectedVoice ? selectedVoice.name : "the selected voice");
+    const voiceNode = $("rehearsalVoiceName");
+    if (voiceNode) voiceNode.textContent = voiceName || "the selected voice";
   }
 
   function voiceMatchProfile(voice) {
@@ -798,6 +800,8 @@
       tagline: persona.tagline || "",
       summary: persona.summary || "",
       profile: collectSponsorProfile(),
+      sourceProfile: persona.profile || {},
+      sourceDescription: persona.sourceDescription || "",
       chips: persona.chips || [],
       initialReaction: persona.initialReaction || "",
       likelyQuestions: persona.likelyQuestions || [],
@@ -845,7 +849,7 @@
 
   function clearVoiceMatchResult() {
     if (!voiceMatchOutput) return;
-    voiceMatchOutput.innerHTML = '<p class="placeholder">Choose a sponsor persona, then compare voices to see the best fit and lever tuning guidance.</p>';
+    voiceMatchOutput.innerHTML = '<p class="placeholder">Match results will show the best-fit voice, ranked alternatives, and lever tuning guidance for the selected voice.</p>';
     const copyBtn = $("copyVoiceMatchBtn");
     if (copyBtn) {
       copyBtn.hidden = true;
@@ -871,7 +875,7 @@
     const oldLabel = btn.innerHTML;
     btn.disabled = true;
     btn.innerHTML = '<span class="spinner"></span> Matching…';
-    voiceMatchOutput.innerHTML = '<p class="placeholder">Asking Azure AI to compare voice resonance and tune levers…</p>';
+    voiceMatchOutput.innerHTML = '<p class="placeholder">Comparing voice resonance for ' + esc(sponsorState.selected.name) + "…</p>";
     try {
       const res = await fetch("api/sponsor-voice-match", {
         method: "POST",
@@ -2106,12 +2110,13 @@
     $("editSponsorBtn").addEventListener("click", () => { if (sponsorState.selected) openSponsorDescribe(sponsorState.selected); });
     $("copySponsorBtn").addEventListener("click", (e) => copyToClipboard(e.currentTarget.dataset.text || "", e.currentTarget));
     $("copyVoiceMatchBtn").addEventListener("click", (e) => copyToClipboard(e.currentTarget.dataset.text || "", e.currentTarget));
+    $("matchVoiceSelect").addEventListener("change", updateSponsorWorkflowContext);
     $("sponsorForm").addEventListener("submit", analyzeSponsorPersona);
     $("voiceMatchForm").addEventListener("submit", analyzeVoiceMatch);
     $("spSaveError").textContent = "";
 
     /* Sponsor personas */
-    clearSponsorOutput();
+    clearSponsorResult();
     clearVoiceMatchResult();
   }
 

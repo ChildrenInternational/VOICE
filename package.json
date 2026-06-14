@@ -1,0 +1,16 @@
+{
+  "name": "voice-aiac",
+  "version": "1.0.0",
+  "description": "VOICE — VOICE's Own Identity & Composition Engine. Explore 13 distinct writing voices.",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "test:e2e": "playwright test"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.54.2"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

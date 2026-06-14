@@ -129,6 +129,7 @@ test("shows marketing sponsor workspace when marketing access is true", async ({
 
   await page.goto("/");
 
+  await expect(page.locator("#voiceIntro")).toBeVisible();
   await expect(page.locator("#gallery-section")).toBeVisible();
   await expect(page.locator("#sponsor-section")).toBeHidden();
   await expect(page.locator("#voiceModeBtn")).toBeVisible();
@@ -136,13 +137,16 @@ test("shows marketing sponsor workspace when marketing access is true", async ({
 
   await page.locator("#sponsorJumpBtn").click();
   await expect(page.locator("#sponsor-section")).toBeVisible();
+  await expect(page.locator("#voiceIntro")).toBeHidden();
   await expect(page.locator("#gallery-section")).toBeHidden();
   await expect(page.locator("#sponsorGrid .voice-card")).toHaveCount(7);
+  await expect(page.getByRole("button", { name: "Test sponsor reaction" })).toBeVisible();
 
   const archetypes = await page.locator("#sponsorGrid .card-archetype").allTextContents();
   expect(new Set(archetypes).size).toBeGreaterThan(1);
 
   await page.locator("#voiceModeBtn").click();
+  await expect(page.locator("#voiceIntro")).toBeVisible();
   await expect(page.locator("#gallery-section")).toBeVisible();
   await expect(page.locator("#sponsor-section")).toBeHidden();
 });
@@ -233,6 +237,7 @@ test("persists sponsor description and normalizes profile selections on save", a
 
 test("uses the sponsor reaction endpoint and renders populated output", async ({ page }) => {
   let reactionCalled = false;
+  let reactionPayload = null;
   let saveCalled = false;
 
   await page.route("**/api/me", async (route) => {
@@ -251,12 +256,13 @@ test("uses the sponsor reaction endpoint and renders populated output", async ({
 
   await page.route("**/api/sponsor-reaction", async (route) => {
     reactionCalled = true;
+    reactionPayload = JSON.parse(route.request().postData() || "{}");
     await route.fulfill({
       status: 200,
       contentType: "application/json",
       body: JSON.stringify({
         persona: {
-          personaName: "The Evidence-Minded Steward",
+          personaName: "The Skeptical Impact Executive",
           personaSummary: "A sponsor who wants concise proof before engaging.",
           initialReaction: "This could work if the evidence is clear.",
           likelyQuestions: ["What changed?", "What proof supports it?", "What action is expected?"],
@@ -268,6 +274,51 @@ test("uses the sponsor reaction endpoint and renders populated output", async ({
       })
     });
   });
+  await page.route("**/api/sponsor-personas", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        personas: [{
+          id: "concert-seeker",
+          name: "The Concert-Introduced Seeker",
+          archetype: "Custom sponsor",
+          tagline: "I came for the moment; show me the mission.",
+          color: "#7C3AED",
+          chips: ["Event-led", "Curious", "Proof-seeking"],
+          summary: "A concert-introduced sponsor who is emotionally open but still needs a clear bridge from the event experience to credible long-term impact.",
+          profile: {
+            ageRange: "35–54",
+            incomeBand: "Middle",
+            geography: "North America",
+            occupationLevel: "Manager",
+            engagementLevel: "Medium",
+            tenure: "New (< 1 yr)",
+            givingPattern: "Monthly Only",
+            channel: "Email",
+            interactionType: "Occasional",
+            motivation: "Impact-driven",
+            emotionalTone: "Optimistic",
+            trustLevel: "Moderate",
+            contentPreference: "Narrative",
+            engagementIntent: "Informational",
+            sponsoredChildren: "Single",
+            letterBehavior: "Rarely",
+            giftActivity: "None",
+            visitProgramEngagement: "No"
+          },
+          initialReaction: "Help me connect what I felt at the concert to what my sponsorship changes.",
+          likelyQuestions: ["What happens next?", "Is this impact real?", "How do I stay connected?"],
+          likelyConcerns: ["Too much institutional language", "No concert connection", "Unclear next step"],
+          recommendedFraming: "Start from the concert memory, then prove the mission with one human outcome.",
+          contentStrategy: { tone: "Warm and credible", length: "Short", structure: "Memory, proof, next step", proof: "One story plus one measurable result" },
+          sourceDescription: "Custom sponsor introduced through a concert.",
+          createdBy: "Test Owner · with VOICE",
+          createdByEmail: "owner@example.com"
+        }]
+      })
+    });
+  });
 
   await page.route("**/api/sponsor-persona", async (route) => {
     saveCalled = true;
@@ -276,12 +327,15 @@ test("uses the sponsor reaction endpoint and renders populated output", async ({
 
   await page.goto("/");
   await page.locator("#sponsorJumpBtn").click();
+  await page.locator("#sponsorGrid .voice-card", { hasText: "The Concert-Introduced Seeker" }).click();
   await page.locator("#sponsorIdea").fill("A sponsor update that leads with impact data before the child story and asks readers to try a new story format.");
   await page.locator("#sponsorAnalyzeBtn").click();
 
-  await expect(page.locator("#sponsorOutput")).toContainText("The Evidence-Minded Steward");
+  await expect(page.locator("#sponsorOutput")).toContainText("Reaction from The Concert-Introduced Seeker");
   await expect(page.locator("#sponsorOutput")).toContainText("This could work if the evidence is clear.");
+  await expect(page.locator("#sponsorOutput")).not.toContainText("The Skeptical Impact Executive");
   expect(reactionCalled).toBe(true);
+  expect(reactionPayload.sponsor.name).toBe("The Concert-Introduced Seeker");
   expect(saveCalled).toBe(false);
 });
 
