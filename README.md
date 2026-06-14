@@ -78,7 +78,7 @@ flowchart LR
     ApiWorkIq[POST /api/work-context-draft]
     ApiDescribe[POST /api/describe]
     ApiSponsor[POST /api/sponsor-reaction]
-    ApiVoices[/api/voices + /api/sponsor-personas]
+    ApiVoices["/api/voices + /api/sponsor-personas"]
     ApiTerms[POST /api/terms/accept]
     ApiAccess[POST /api/access-request]
     Srv --> ApiHealth
