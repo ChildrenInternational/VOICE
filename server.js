@@ -16,6 +16,13 @@
      MARKETING_EMAILS   comma-separated emails allowed to use sponsor personas.
     WORK_IQ_ENDPOINT   optional Work IQ gateway endpoint used for M365 context.
     WORK_IQ_API_KEY    optional bearer token for the Work IQ gateway.
+    WORK_IQ_AGENT_ENDPOINT
+               optional Foundry project endpoint for agent-based Work IQ.
+    WORK_IQ_AGENT_API_KEY
+               optional API key for the Foundry project endpoint.
+    WORK_IQ_AGENT_NAME optional Foundry agent name to call for Work IQ retrieval.
+    WORK_IQ_AGENT_VERSION
+               optional Foundry agent version to target.
     WORK_IQ_FORWARD_ACCESS_TOKEN
                        "true" to forward Easy Auth's delegated user access
                        token to the configured Work IQ gateway.
@@ -60,12 +67,23 @@ function workIqCfg() {
   return {
     endpoint: (process.env.WORK_IQ_ENDPOINT || "").trim(),
     apiKey: process.env.WORK_IQ_API_KEY || "",
-    forwardAccessToken: String(process.env.WORK_IQ_FORWARD_ACCESS_TOKEN || "").toLowerCase() === "true"
+    forwardAccessToken: String(process.env.WORK_IQ_FORWARD_ACCESS_TOKEN || "").toLowerCase() === "true",
+    agentEndpoint: (process.env.WORK_IQ_AGENT_ENDPOINT || "").trim(),
+    agentApiKey: process.env.WORK_IQ_AGENT_API_KEY || "",
+    agentName: (process.env.WORK_IQ_AGENT_NAME || "").trim(),
+    agentVersion: (process.env.WORK_IQ_AGENT_VERSION || "").trim()
   };
 }
 
+function workIqMode() {
+  const wc = workIqCfg();
+  if (wc.agentEndpoint && wc.agentName) return "agent";
+  if (wc.endpoint) return "gateway";
+  return null;
+}
+
 function workIqConfigured() {
-  return !!workIqCfg().endpoint;
+  return !!workIqMode();
 }
 
 function sendJson(res, status, obj) {
@@ -339,7 +357,184 @@ function normalizeWorkIqContext(data) {
   return { summary, references };
 }
 
-async function fetchWorkIqContext(req, principal, { query, content, voiceName }) {
+function buildResponsesUrl(endpoint) {
+  const base = String(endpoint || "").trim().replace(/\/+$/, "");
+  if (!base) return "";
+  if (/\/openai\/v1\/responses$/i.test(base)) return base;
+  if (/\/openai\/v1$/i.test(base)) return base + "/responses";
+  return base + "/openai/v1/responses";
+}
+
+function extractJsonObject(text) {
+  const raw = String(text || "");
+  const fence = /```(?:json)?\s*([\s\S]*?)```/i.exec(raw);
+  const body = fence ? fence[1] : raw;
+  const start = body.indexOf("{");
+  const end = body.lastIndexOf("}");
+  if (start < 0 || end <= start) throw new Error("Agent response did not include JSON.");
+  return JSON.parse(body.slice(start, end + 1));
+}
+
+function extractResponseOutputText(data) {
+  if (data && typeof data.output_text === "string" && data.output_text.trim()) return data.output_text.trim();
+  const output = Array.isArray(data && data.output) ? data.output : [];
+  const parts = [];
+  output.forEach((item) => {
+    const content = Array.isArray(item && item.content) ? item.content : [];
+    content.forEach((chunk) => {
+      if (typeof chunk.text === "string" && chunk.text.trim()) parts.push(chunk.text.trim());
+      if (chunk.type === "output_text" && typeof chunk.text === "string" && chunk.text.trim()) parts.push(chunk.text.trim());
+    });
+  });
+  return parts.join("\n").trim();
+}
+
+function normalizeAgentReferences(raw) {
+  const list = Array.isArray(raw) ? raw : [];
+  return list.slice(0, 12).map((item, i) => {
+    const v = item && typeof item === "object" ? item : { title: String(item || "") };
+    const id = String(v.id || v.refId || v.url || ("ref-" + (i + 1))).slice(0, 200);
+    const title = String(v.title || v.name || ("Reference " + (i + 1))).slice(0, 180);
+    const source = String(v.source || v.type || "").slice(0, 120);
+    const url = String(v.url || v.link || "").slice(0, 500);
+    const snippet = String(v.snippet || v.summary || "").slice(0, 500);
+    return { id, title, source, url, snippet };
+  }).filter((r) => r.id || r.title || r.url || r.snippet);
+}
+
+async function callWorkIqAgent(req, principal, prompt) {
+  const wc = workIqCfg();
+  const endpoint = buildResponsesUrl(wc.agentEndpoint);
+  if (!endpoint) throw new Error("WORK_IQ_AGENT_ENDPOINT is required for agent mode.");
+  if (!wc.agentName) throw new Error("WORK_IQ_AGENT_NAME is required for agent mode.");
+  const apiKey = wc.agentApiKey || wc.apiKey || cfg().apiKey;
+  if (!apiKey) throw new Error("WORK_IQ_AGENT_API_KEY (or WORK_IQ_API_KEY / AI_API_KEY) is required for agent mode.");
+
+  const agentReference = {
+    type: "agent_reference",
+    name: wc.agentName
+  };
+  if (wc.agentVersion) agentReference.version = wc.agentVersion;
+
+  const headers = {
+    "Content-Type": "application/json",
+    "api-key": apiKey,
+    "x-voice-user-email": principal.email || "",
+    "x-voice-user-name": principal.name || ""
+  };
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 45000);
+  try {
+    const response = await fetch(endpoint, {
+      method: "POST",
+      headers,
+      signal: controller.signal,
+      body: JSON.stringify({
+        input: String(prompt || "").slice(0, 20000),
+        agent_reference: agentReference
+      })
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      const msg = data && data.error && data.error.message
+        ? data.error.message
+        : (data && data.error ? JSON.stringify(data.error) : ("Agent call returned " + response.status));
+      throw new Error(msg);
+    }
+    const text = extractResponseOutputText(data);
+    if (!text) throw new Error("Agent call returned an empty response.");
+    return text;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+async function searchWorkIqAgentReferences(req, principal, { query, content }) {
+  const prompt = [
+    "You are helping retrieve Microsoft 365 context for drafting.",
+    "Return STRICT JSON with this shape and no markdown:",
+    "{\"summary\":string,\"references\":[{\"id\":string,\"title\":string,\"source\":string,\"url\":string,\"snippet\":string}]}",
+    "Return 3-8 references relevant to the query.",
+    "Use stable id values so one can be selected in a later request.",
+    "",
+    "QUERY:",
+    String(query || ""),
+    "",
+    "CURRENT DRAFT CONTEXT (optional):",
+    String(content || "").slice(0, 6000)
+  ].join("\n");
+
+  const text = await callWorkIqAgent(req, principal, prompt);
+  const data = extractJsonObject(text);
+  return {
+    summary: String(data.summary || "").slice(0, 3000),
+    references: normalizeAgentReferences(data.references)
+  };
+}
+
+async function loadWorkIqAgentReferenceContent(req, principal, { query, reference }) {
+  const ref = reference && typeof reference === "object" ? reference : {};
+  const prompt = [
+    "You are helping retrieve full source text for rewriting.",
+    "Return STRICT JSON with no markdown:",
+    "{\"content\":string,\"reference\":{\"id\":string,\"title\":string,\"source\":string,\"url\":string}}",
+    "The content should be the best available substantive text for the selected reference.",
+    "",
+    "USER QUERY:",
+    String(query || ""),
+    "",
+    "SELECTED REFERENCE:",
+    JSON.stringify({
+      id: String(ref.id || ""),
+      title: String(ref.title || ""),
+      source: String(ref.source || ""),
+      url: String(ref.url || ""),
+      snippet: String(ref.snippet || "")
+    })
+  ].join("\n");
+
+  const text = await callWorkIqAgent(req, principal, prompt);
+  const data = extractJsonObject(text);
+  const loadedReference = normalizeAgentReferences([data.reference || ref])[0] || {
+    id: String(ref.id || "ref"),
+    title: String(ref.title || "Reference"),
+    source: String(ref.source || ""),
+    url: String(ref.url || ""),
+    snippet: ""
+  };
+  return {
+    content: String(data.content || "").slice(0, 30000),
+    reference: loadedReference
+  };
+}
+
+async function fetchWorkIqAgentDraftContext(req, principal, { query, content, voiceName }) {
+  const prompt = [
+    "You are gathering work context to support a rewrite request.",
+    "Return STRICT JSON and no markdown:",
+    "{\"summary\":string,\"references\":[{\"title\":string,\"source\":string,\"url\":string,\"snippet\":string}]}",
+    "Summary should capture the most relevant facts only.",
+    "",
+    "REWRITE INTENT:",
+    String(query || ""),
+    "",
+    "VOICE NAME:",
+    String(voiceName || ""),
+    "",
+    "DRAFT CONTENT:",
+    String(content || "").slice(0, 12000)
+  ].join("\n");
+
+  const text = await callWorkIqAgent(req, principal, prompt);
+  const data = extractJsonObject(text);
+  return normalizeWorkIqContext(data);
+}
+
+async function fetchWorkIqContext(req, principal, { query, content, voiceName, channelTarget }) {
+  if (workIqMode() === "agent") {
+    return fetchWorkIqAgentDraftContext(req, principal, { query, content, voiceName });
+  }
   const wc = workIqCfg();
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 30000);
@@ -363,6 +558,7 @@ async function fetchWorkIqContext(req, principal, { query, content, voiceName })
         query,
         content,
         voiceName,
+        channelTarget: channelTarget && typeof channelTarget === "object" ? channelTarget : undefined,
         user: {
           name: principal.name || "",
           email: principal.email || ""
@@ -382,6 +578,50 @@ async function fetchWorkIqContext(req, principal, { query, content, voiceName })
     return context;
   } finally {
     clearTimeout(timeout);
+  }
+}
+
+async function handleWorkIqAgentSearch(req, res, principal) {
+  if (workIqMode() !== "agent") {
+    return sendJson(res, 400, { error: "Work IQ agent mode is not configured. Set WORK_IQ_AGENT_ENDPOINT and WORK_IQ_AGENT_NAME." });
+  }
+  let payload;
+  try {
+    payload = JSON.parse(await readBody(req));
+  } catch {
+    return sendJson(res, 400, { error: "Invalid JSON body." });
+  }
+  const query = String(payload.query || "").trim().slice(0, 1200);
+  const content = String(payload.content || "").slice(0, 30000);
+  if (!query) return sendJson(res, 400, { error: "query is required." });
+  try {
+    const result = await searchWorkIqAgentReferences(req, principal, { query, content });
+    sendJson(res, 200, result);
+  } catch (e) {
+    sendJson(res, 502, { error: e.message });
+  }
+}
+
+async function handleWorkIqAgentLoad(req, res, principal) {
+  if (workIqMode() !== "agent") {
+    return sendJson(res, 400, { error: "Work IQ agent mode is not configured. Set WORK_IQ_AGENT_ENDPOINT and WORK_IQ_AGENT_NAME." });
+  }
+  let payload;
+  try {
+    payload = JSON.parse(await readBody(req));
+  } catch {
+    return sendJson(res, 400, { error: "Invalid JSON body." });
+  }
+  const query = String(payload.query || "").trim().slice(0, 1200);
+  const reference = payload.reference && typeof payload.reference === "object" ? payload.reference : null;
+  if (!query) return sendJson(res, 400, { error: "query is required." });
+  if (!reference) return sendJson(res, 400, { error: "reference is required." });
+  try {
+    const result = await loadWorkIqAgentReferenceContent(req, principal, { query, reference });
+    if (!result.content) return sendJson(res, 502, { error: "Agent returned no content for the selected reference." });
+    sendJson(res, 200, result);
+  } catch (e) {
+    sendJson(res, 502, { error: e.message });
   }
 }
 
@@ -429,6 +669,12 @@ async function handleWorkContextDraft(req, res, principal) {
   const content = String(payload.content || "").trim().slice(0, 30000);
   const voiceName = String(payload.voiceName || "selected voice").slice(0, 120);
   const contextQuery = String(payload.contextQuery || "").trim().slice(0, 1200);
+  const channelTarget = payload.channelTarget && typeof payload.channelTarget === "object"
+    ? {
+      primary: String(payload.channelTarget.primary || "").slice(0, 40),
+      subchannel: String(payload.channelTarget.subchannel || "").slice(0, 40)
+    }
+    : null;
   let temperature = Number(payload.temperature);
   if (!system || !user || !content) return sendJson(res, 400, { error: "system, user, and content are required." });
   if (!contextQuery) return sendJson(res, 400, { error: "Describe what VOICE should look for in your work context." });
@@ -440,7 +686,8 @@ async function handleWorkContextDraft(req, res, principal) {
     const context = await fetchWorkIqContext(req, principal, {
       query: contextQuery,
       content,
-      voiceName
+      voiceName,
+      channelTarget
     });
     const args = {
       system: buildWorkIqSystemPrompt(system, context),
@@ -1635,7 +1882,8 @@ http.createServer((req, res) => {
     return sendJson(res, 200, {
       configured: configured(),
       model: configured() ? cfg().model : null,
-      workIqConfigured: workIqConfigured()
+      workIqConfigured: workIqConfigured(),
+      workIqMode: workIqMode()
     });
   }
   if (route === "/api/transform" && req.method === "POST") {
@@ -1643,6 +1891,12 @@ http.createServer((req, res) => {
   }
   if (route === "/api/work-context-draft" && req.method === "POST") {
     return handleWorkContextDraft(req, res, auth.principal).catch((e) => sendJson(res, 500, { error: e.message }));
+  }
+  if (route === "/api/workiq-agent-search" && req.method === "POST") {
+    return handleWorkIqAgentSearch(req, res, auth.principal).catch((e) => sendJson(res, 500, { error: e.message }));
+  }
+  if (route === "/api/workiq-agent-load" && req.method === "POST") {
+    return handleWorkIqAgentLoad(req, res, auth.principal).catch((e) => sendJson(res, 500, { error: e.message }));
   }
   if (route === "/api/fingerprint" && req.method === "POST") {
     /* Hyper-personalization: owners only (until full Entra roles exist) + signed terms */

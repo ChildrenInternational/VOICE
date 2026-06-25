@@ -10,6 +10,32 @@ test("renders core VOICE workspace and built-in personas", async ({ page }) => {
   await expect(page.locator("#transformBtn")).toBeVisible();
 });
 
+test("tailors transform prompt for selected channel and social sub-channel", async ({ page }) => {
+  let transformPayload = null;
+  await page.route("**/api/transform", async (route) => {
+    transformPayload = JSON.parse(route.request().postData() || "{}");
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({ text: "Social-ready draft." })
+    });
+  });
+
+  await page.goto("/");
+  await page.locator("#voiceGrid .voice-card").first().click();
+  await page.locator("#inputText").fill("We are launching a new donor stewardship sprint.");
+  await page.locator("#channelPrimary").selectOption("social");
+  await expect(page.locator("#socialChannelWrap")).toBeVisible();
+  await page.locator("#channelSocial").selectOption("linkedin");
+  await page.locator("#transformBtn").click();
+
+  await expect(page.locator("#outputArea")).toContainText("Social-ready draft.");
+  expect(transformPayload.channelTarget.primary).toBe("social");
+  expect(transformPayload.channelTarget.subchannel).toBe("linkedin");
+  expect(transformPayload.user).toContain("Primary channel: social.");
+  expect(transformPayload.user).toContain("Sub-channel: linkedin.");
+});
+
 test("shows Work IQ drafting controls to members with clear disabled state", async ({ page }) => {
   await page.route("**/api/me", async (route) => {
     await route.fulfill({
@@ -98,6 +124,83 @@ test("uses Work IQ endpoint and renders returned context", async ({ page }) => {
   await expect(page.locator("#workIqContextPanel")).toContainText("AI Hub launch notes");
   expect(workIqPayload.contextQuery).toBe("Find recent launch planning context.");
   expect(workIqPayload.voiceName).toBe("The Field Operator");
+});
+
+test("loads agent-selected work reference into draft and allows transform", async ({ page }) => {
+  let transformPayload = null;
+  await page.route("**/api/me", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        name: "Test Member",
+        email: "member@example.com",
+        role: "member",
+        marketingAccess: false,
+        termsAccepted: false
+      })
+    });
+  });
+  await page.route("**/api/health", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({ configured: true, model: "test-model", workIqConfigured: true, workIqMode: "agent" })
+    });
+  });
+  await page.route("**/api/workiq-agent-search", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        references: [
+          {
+            id: "ref-1",
+            title: "Project Contoso launch notes",
+            source: "SharePoint",
+            url: "https://contoso.example/launch",
+            snippet: "Decision log and rollout milestones."
+          }
+        ]
+      })
+    });
+  });
+  await page.route("**/api/workiq-agent-load", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        document: {
+          title: "Project Contoso launch notes",
+          source: "SharePoint",
+          url: "https://contoso.example/launch",
+          content: "Launch comms should start two weeks before GA with manager-ready talking points."
+        }
+      })
+    });
+  });
+  await page.route("**/api/transform", async (route) => {
+    transformPayload = JSON.parse(route.request().postData() || "{}");
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({ text: "Stylized output from loaded reference." })
+    });
+  });
+
+  await page.goto("/");
+  await page.locator("#voiceGrid .voice-card").first().click();
+  await page.locator("#workIqEnabled").check();
+  await page.locator("#workIqQuery").fill("Find launch references for Contoso rollout.");
+  await page.locator("#workIqFindRefsBtn").click();
+  await expect(page.locator("#workIqRefList")).toBeVisible();
+  await page.locator("#workIqRefList .workiq-ref-pick").first().click();
+  await expect(page.locator("#inputText")).toHaveValue(/Launch comms should start two weeks before GA/);
+
+  await page.locator("#workIqEnabled").uncheck();
+  await page.locator("#transformBtn").click();
+  await expect(page.locator("#outputArea")).toContainText("Stylized output from loaded reference.");
+  expect(transformPayload.user).toContain("Launch comms should start two weeks before GA");
 });
 
 test("shows owner fingerprint controls", async ({ page }) => {

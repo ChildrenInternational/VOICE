@@ -16,12 +16,27 @@
   let activeArchetype = "All";
   let serverConfigured = null;
   let workIqConfigured = false;
+  let workIqMode = null;
   let pendingColor = "#475569";
   let pendingCustomPrompt = null;    /* AI-crafted prompt awaiting save (fingerprint flow) */
   let currentUser = { name: "", email: "", role: "member", marketingAccess: false, termsAccepted: false };
   let saveMode = { updateId: null }; /* save modal: null = create new, else update in place */
   let sponsorState = { selected: null, draft: null, updateId: null, color: "#475569" };
   let activeWorkspace = "voice";
+
+  const CHANNEL_HINTS = {
+    email: "Optimize for inbox readability with a clear subject-style opening, concise body, and a direct call to action.",
+    mail: "Optimize for printed direct mail with narrative flow, emotional clarity, and a concrete response ask.",
+    website: "Optimize for web scanning with short sections, clear headings, and skimmable structure.",
+    social: "Optimize for social-native cadence, immediate hook, and concise, shareable phrasing."
+  };
+
+  const SOCIAL_HINTS = {
+    linkedin: "LinkedIn: professional credibility, practical insight, and business-oriented outcomes.",
+    tiktok: "TikTok: short punchy lines, vivid hook, high energy, and conversational momentum.",
+    instagram: "Instagram: visual-first language, concise caption rhythm, and community-friendly tone.",
+    facebook: "Facebook: warm, conversational framing with context suitable for broad community sharing."
+  };
 
   const SWATCHES = ["#C2410C", "#D97706", "#0D9488", "#059669", "#0369A1", "#1D4ED8", "#4338CA", "#7C3AED", "#BE185D", "#B91C1C", "#475569", "#334155"];
 
@@ -140,8 +155,58 @@
     return s.replace(/[“”]/g, "'");
   }
 
-  function buildUserPrompt(voice, content) {
-    return "Rewrite the following content in the \"" + voice.name + "\" voice as defined in your instructions.\n\n--- CONTENT START ---\n" + content + "\n--- CONTENT END ---";
+  function getChannelTarget() {
+    const primaryEl = $("channelPrimary");
+    const socialEl = $("channelSocial");
+    const primary = primaryEl ? String(primaryEl.value || "email").toLowerCase() : "email";
+    const social = socialEl ? String(socialEl.value || "linkedin").toLowerCase() : "linkedin";
+    const subchannel = primary === "social" ? social : "";
+    const label = primary === "social"
+      ? ("social / " + (subchannel || "linkedin"))
+      : primary;
+    return { primary, subchannel, label };
+  }
+
+  function updateChannelState() {
+    const primaryEl = $("channelPrimary");
+    const socialWrap = $("socialChannelWrap");
+    const hint = $("channelHint");
+    if (!primaryEl || !socialWrap || !hint) return;
+    const target = getChannelTarget();
+    socialWrap.hidden = target.primary !== "social";
+    let text = CHANNEL_HINTS[target.primary] || CHANNEL_HINTS.email;
+    if (target.primary === "social") {
+      text += " " + (SOCIAL_HINTS[target.subchannel] || SOCIAL_HINTS.linkedin);
+    }
+    hint.textContent = text;
+  }
+
+  function buildChannelPromptContext(channelTarget) {
+    const target = channelTarget || getChannelTarget();
+    const lines = [];
+    lines.push("CHANNEL TARGET:");
+    lines.push("Primary channel: " + target.primary + ".");
+    if (target.primary === "social") {
+      lines.push("Sub-channel: " + (target.subchannel || "linkedin") + ".");
+      lines.push("Adapt format and tone for this social sub-channel.");
+      lines.push(SOCIAL_HINTS[target.subchannel] || SOCIAL_HINTS.linkedin);
+    } else {
+      lines.push(CHANNEL_HINTS[target.primary] || CHANNEL_HINTS.email);
+    }
+    lines.push("Keep facts intact while adapting structure, pacing, and delivery to the selected channel.");
+    return lines.join("\n");
+  }
+
+  function buildUserPrompt(voice, content, channelTarget) {
+    return [
+      "Rewrite the following content in the \"" + voice.name + "\" voice as defined in your instructions.",
+      "",
+      buildChannelPromptContext(channelTarget),
+      "",
+      "--- CONTENT START ---",
+      content,
+      "--- CONTENT END ---"
+    ].join("\n");
   }
 
   /* =========================================================================
@@ -155,6 +220,7 @@
       const data = await res.json();
       serverConfigured = !!data.configured;
       workIqConfigured = !!data.workIqConfigured;
+      workIqMode = data.workIqMode || null;
       if (serverConfigured) {
         el.textContent = "AI connected · " + (data.model || "ready");
         el.classList.add("ok");
@@ -904,12 +970,14 @@
   }
 
   async function callServer(voice, content) {
+    const channelTarget = getChannelTarget();
     const res = await fetch("api/transform", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         system: buildSystemPrompt(voice, workingSettings),
-        user: buildUserPrompt(voice, content),
+        user: buildUserPrompt(voice, content, channelTarget),
+        channelTarget,
         temperature: voice.temperature
       })
     });
@@ -921,21 +989,47 @@
 
   async function callWorkIqServer(voice, content) {
     const query = $("workIqQuery").value.trim();
+    const channelTarget = getChannelTarget();
     const res = await fetch("api/work-context-draft", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         system: buildSystemPrompt(voice, workingSettings),
-        user: buildUserPrompt(voice, content),
+        user: buildUserPrompt(voice, content, channelTarget),
         content,
         contextQuery: query,
         voiceName: voice.name,
+        channelTarget,
         temperature: voice.temperature
       })
     });
     const data = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(data.error || ("Server returned " + res.status));
     if (!data.text) throw new Error("Server returned an empty response.");
+    return data;
+  }
+
+  async function searchWorkIqAgentReferences(voice, content) {
+    const query = $("workIqQuery").value.trim();
+    const res = await fetch("api/workiq-agent-search", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ query, content, voiceName: voice.name })
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || ("Server returned " + res.status));
+    return data;
+  }
+
+  async function loadWorkIqAgentReference(reference) {
+    const query = $("workIqQuery").value.trim();
+    const res = await fetch("api/workiq-agent-load", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ query, reference })
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || ("Server returned " + res.status));
     return data;
   }
 
@@ -951,7 +1045,11 @@
     if (!enabled || !status || !options) return;
     enabled.disabled = !workIqConfigured;
     if (workIqConfigured) {
-      status.textContent = "Work IQ connected. Your query is sent server-side and grounded in your Microsoft 365 context.";
+      if (workIqMode === "agent") {
+        status.textContent = "Work agent connected. Search references, pick one, and load content into the draft.";
+      } else {
+        status.textContent = "Work IQ connected. Your query is sent server-side and grounded in your Microsoft 365 context.";
+      }
       status.classList.add("ok");
       status.classList.remove("warn");
     } else {
@@ -961,6 +1059,88 @@
       status.classList.remove("ok");
     }
     options.hidden = !enabled.checked || enabled.disabled;
+    const picker = $("workIqAgentPicker");
+    if (picker) picker.hidden = options.hidden || workIqMode !== "agent";
+  }
+
+  function renderWorkIqAgentReferences(refs) {
+    const list = $("workIqRefList");
+    if (!list) return;
+    const items = Array.isArray(refs) ? refs : [];
+    if (!items.length) {
+      list.hidden = true;
+      list.innerHTML = "";
+      return;
+    }
+    list.hidden = false;
+    list.innerHTML = "";
+    items.forEach((ref) => {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "workiq-ref-pick";
+      btn.innerHTML =
+        "<strong>" + esc(ref.title || "Reference") + "</strong>" +
+        "<small>" + esc(ref.source || "") + (ref.url ? " · " + esc(ref.url) : "") + "</small>" +
+        (ref.snippet ? "<p>" + esc(ref.snippet) + "</p>" : "");
+      btn.addEventListener("click", () => onPickWorkIqReference(ref));
+      list.appendChild(btn);
+    });
+  }
+
+  function setWorkIqAgentStatus(message, kind) {
+    const el = $("workIqAgentStatus");
+    if (!el) return;
+    el.textContent = message;
+    el.classList.remove("ok", "warn");
+    if (kind === "ok" || kind === "warn") el.classList.add(kind);
+  }
+
+  async function onFindWorkIqReferences() {
+    if (!selectedVoice) return;
+    const query = $("workIqQuery").value.trim();
+    if (!query) {
+      setWorkIqAgentStatus("Add a work-context query first.", "warn");
+      return;
+    }
+    const content = $("inputText").value.trim();
+    const btn = $("workIqFindRefsBtn");
+    const old = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = "Finding...";
+    setWorkIqAgentStatus("Searching work references...", null);
+    renderWorkIqAgentReferences([]);
+    try {
+      const data = await searchWorkIqAgentReferences(selectedVoice, content);
+      const refs = Array.isArray(data.references) ? data.references : [];
+      renderWorkIqAgentReferences(refs);
+      if (refs.length) {
+        setWorkIqAgentStatus("Pick one reference to load content into your draft.", "ok");
+      } else {
+        setWorkIqAgentStatus("No references found. Try a narrower query.", "warn");
+      }
+    } catch (e) {
+      setWorkIqAgentStatus(e.message || "Could not search references.", "warn");
+    } finally {
+      btn.disabled = false;
+      btn.textContent = old;
+    }
+  }
+
+  async function onPickWorkIqReference(reference) {
+    const status = $("workIqAgentStatus");
+    if (status) setWorkIqAgentStatus("Loading selected reference...", null);
+    try {
+      const data = await loadWorkIqAgentReference(reference);
+      const doc = data.document || data;
+      const text = String(doc.content || "").trim();
+      if (!text) throw new Error("The selected reference returned no content.");
+      $("inputText").value = text;
+      const label = doc.title ? "Loaded: " + doc.title : "Loaded selected reference into the draft.";
+      setWorkIqAgentStatus(label, "ok");
+      showOutput('<p class="placeholder">Reference loaded into Your content. Click Transform when ready.</p>');
+    } catch (e) {
+      setWorkIqAgentStatus(e.message || "Could not load selected reference.", "warn");
+    }
   }
 
   function clearWorkIqContext() {
@@ -2011,8 +2191,9 @@
     const suffix = selectedVoice.customPrompt ? " (personal prompt)" : (dirtyCount() > 0 ? " (custom-tuned)" : "");
     $("promptVoiceName").textContent = selectedVoice.name + suffix;
     const content = $("inputText").value.trim() || "[your content here]";
+    const channelTarget = getChannelTarget();
     const full = "SYSTEM PROMPT\n=============\n" + buildSystemPrompt(selectedVoice, workingSettings) +
-      "\n\nUSER PROMPT\n===========\n" + buildUserPrompt(selectedVoice, content) +
+      "\n\nUSER PROMPT\n===========\n" + buildUserPrompt(selectedVoice, content, channelTarget) +
       "\n\nPARAMETERS\n==========\ntemperature: " + (selectedVoice.temperature != null ? selectedVoice.temperature : 0.5) + "\nmax_tokens: 4000";
     $("promptText").textContent = full;
     $("promptModal").showModal();
@@ -2057,6 +2238,10 @@
     $("viewPromptBtn").addEventListener("click", openPromptViewer);
     $("closePromptBtn").addEventListener("click", () => $("promptModal").close());
     $("workIqEnabled").addEventListener("change", updateWorkIqState);
+    $("channelPrimary").addEventListener("change", updateChannelState);
+    $("channelSocial").addEventListener("change", updateChannelState);
+    const findRefsBtn = $("workIqFindRefsBtn");
+    if (findRefsBtn) findRefsBtn.addEventListener("click", onFindWorkIqReferences);
 
     $("copyPromptBtn").addEventListener("click", (e) => copyToClipboard($("promptText").textContent, e.currentTarget));
     $("copyOutputBtn").addEventListener("click", (e) => copyToClipboard(e.currentTarget.dataset.text || "", e.currentTarget));
@@ -2118,6 +2303,7 @@
     /* Sponsor personas */
     clearSponsorResult();
     clearVoiceMatchResult();
+    updateChannelState();
   }
 
   init();

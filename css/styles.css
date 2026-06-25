@@ -1103,6 +1103,50 @@ textarea:focus { outline: 2px solid var(--accent); outline-offset: -1px; border-
 
 .studio-actions { display: flex; gap: 10px; margin-top: 14px; flex-wrap: wrap; }
 
+.channel-panel {
+  margin-top: 14px;
+  padding: 14px;
+  border: 1px solid #dbeafe;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #f8fafc, #f1f5f9);
+  display: grid;
+  gap: 8px;
+}
+
+.channel-panel label {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--ink-soft);
+}
+
+.channel-panel select {
+  font: inherit;
+  font-size: 0.88rem;
+  width: 100%;
+  border: 1px solid var(--line-strong);
+  border-radius: 8px;
+  padding: 9px 11px;
+  color: var(--ink);
+  background: #fff;
+}
+
+.channel-panel select:focus {
+  outline: 2px solid var(--accent);
+  outline-offset: -1px;
+  border-color: transparent;
+}
+
+.channel-sub {
+  display: grid;
+  gap: 6px;
+}
+
+.channel-hint {
+  margin: 0;
+  color: var(--ink-faint);
+  font-size: 0.78rem;
+}
+
 .hint { font-size: 0.82rem; color: #92400e; background: #fffbeb; border: 1px solid #fde68a; border-radius: 8px; padding: 9px 12px; margin: 12px 0 0; }
 
 .workiq-panel {
@@ -1160,6 +1204,61 @@ textarea:focus { outline: 2px solid var(--accent); outline-offset: -1px; border-
 .workiq-options textarea {
   min-height: 92px;
   background: #fff;
+}
+
+.workiq-agent-picker {
+  margin-top: 10px;
+}
+
+.workiq-agent-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.workiq-agent-actions .workiq-status {
+  margin: 0;
+}
+
+.workiq-ref-list {
+  display: grid;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.workiq-ref-pick {
+  display: grid;
+  gap: 4px;
+  width: 100%;
+  text-align: left;
+  border: 1px solid #bfdbfe;
+  border-radius: 8px;
+  background: #fff;
+  padding: 10px 12px;
+  cursor: pointer;
+  color: var(--ink);
+}
+
+.workiq-ref-pick:hover {
+  border-color: #60a5fa;
+  background: #f8fbff;
+}
+
+.workiq-ref-pick strong {
+  color: #1d4ed8;
+  font-size: 0.84rem;
+}
+
+.workiq-ref-pick small {
+  color: var(--ink-faint);
+  font-size: 0.76rem;
+}
+
+.workiq-ref-pick p {
+  margin: 0;
+  color: var(--ink-soft);
+  font-size: 0.8rem;
 }
 
 .output-area {

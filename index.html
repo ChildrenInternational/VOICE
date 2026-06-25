@@ -175,6 +175,25 @@
             <button class="btn btn-ghost btn-sm" id="sampleBtn" type="button">Use sample content</button>
           </div>
           <textarea id="inputText" rows="9" placeholder="Paste the content you want rewritten in the selected voice…"></textarea>
+          <div class="channel-panel" id="channelPanel">
+            <label for="channelPrimary">Channel target</label>
+            <select id="channelPrimary">
+              <option value="email">Email</option>
+              <option value="mail">Mail</option>
+              <option value="website">Website</option>
+              <option value="social">Social</option>
+            </select>
+            <div class="channel-sub" id="socialChannelWrap" hidden>
+              <label for="channelSocial">Social channel</label>
+              <select id="channelSocial">
+                <option value="linkedin">LinkedIn</option>
+                <option value="tiktok">TikTok</option>
+                <option value="instagram">Instagram</option>
+                <option value="facebook">Facebook</option>
+              </select>
+            </div>
+            <p class="channel-hint" id="channelHint">VOICE will tailor language and structure for the selected channel.</p>
+          </div>
           <div class="workiq-panel" id="workIqPanel">
             <label class="workiq-toggle">
               <input id="workIqEnabled" type="checkbox">
@@ -187,6 +206,13 @@
             <div class="workiq-options" id="workIqOptions" hidden>
               <label for="workIqQuery">What should VOICE look for in your work context?</label>
               <textarea id="workIqQuery" rows="3" placeholder="Example: recent Teams discussions, meeting notes, and documents about the AI Hub launch"></textarea>
+              <div class="workiq-agent-picker" id="workIqAgentPicker" hidden>
+                <div class="workiq-agent-actions">
+                  <button class="btn btn-ghost btn-sm" id="workIqFindRefsBtn" type="button">Find references</button>
+                  <span id="workIqAgentStatus" class="workiq-status">Search your work references, pick one, then load it into the draft.</span>
+                </div>
+                <div id="workIqRefList" class="workiq-ref-list" hidden></div>
+              </div>
             </div>
           </div>
           <div class="studio-actions">
